@@ -2,6 +2,7 @@
 #define TYPES_H
 
 #include <time.h>
+#include "config.h"
 
 /* Header file che si occupa di definire i tipi struct che verranno utilizzati dagli altri moduli,
 ho diviso le strutture dalla logica in modo da evitare ridondanze di codice nei vari moduli e 
@@ -19,7 +20,7 @@ typedef enum{
 typedef struct{
     int id;
     ColumnType col;  //collocazione della carta
-    char text[256]; //descrizione attività
+    char text[MAX_TEXT_LEN]; //descrizione attività
 
     int user_port;  //num di porta dell'utente 
     time_t timestamp; //ts ultima modifica
