@@ -1,6 +1,8 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
+#include "types.h"
+
 /* Header file contenente la lista di tutti i comandi utilizzabili da server/client e della struttura dati che definisce
  il formato dell'informazione che vienen scambiato in un pacchetto, ciò rende la comunicazione più semplice e evita 
  di specificare ogni volta la dimensione del messaggio*/
@@ -23,6 +25,19 @@
 
  }Command;
 
- //DA DEFINIRE IL FORMATO DEL PACCHETTO
+ typedef struct {
+
+   Command cmd; //tipo di comando
+   int sender_port; //porta del sender
+
+   //UTENTI
+   Card card; //card creata con CREATE_CARD
+   int cost; //costo dell'utente
+
+   //LAVAGNA
+   int n_users; //numero di utenti registrati
+   int users_ports[MAX_UTENTI-1]; //lista di porte degli utenti
+
+ } Packet;
 
 #endif
