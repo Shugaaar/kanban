@@ -17,4 +17,7 @@ unico aiuta all'eventuale modifica di questi ultimi*/
 
 #define MAX_TEXT_LEN 256 // Lunghezza massima del testo di un'attività 
 
+#define WIDTH_LAVAGNA 60 //spessore in caratteri della lavagna
+
+
 #endif
