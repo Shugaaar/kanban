@@ -6,14 +6,24 @@ void send_packet(int socket,Packet *p,struct sockaddr_in *dest){
     sendto(socket,p,sizeof(Packet),0,(struct sockaddr*) dest,sizeof(dest));
 }
 
+//assegna i parametri alla carta puntata da c
+void create_card(Card* c,int id,ColumnType col,const char text[256]){
+    c->id=id;
+    c->col=col;
+    c->user_port=0;
+    strcpy(c->text,text);
+    c->next=0xFFFFFFFF;
+    c->timestamp=time(NULL);
+}
+
 //copia la carta src in dst
-void copy_card(Card src,Card dst){
-    dst.col=src.col;
-    dst.id=src.id;
-    dst.next=src.next;
-    strcpy(dst.text,src.text);
-    dst.timestamp=src.timestamp;
-    dst.user_port=src.user_port;
+void copy_card(Card src,Card* dst){
+    dst->col=src.col;
+    dst->id=src.id;
+    dst->next=src.next;
+    strcpy(dst->text,src.text);
+    dst->timestamp=src.timestamp;
+    dst->user_port=src.user_port;
 }
 
 //fornisce una rappresentazione grafica della carta

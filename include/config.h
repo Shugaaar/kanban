@@ -8,6 +8,7 @@ unico aiuta all'eventuale modifica di questi ultimi*/
 #define LAVAGNA_PORT 5678 // Porta della lavagna 
 #define UTENTE_PORT_START 5679 // Porta iniziale per gli utenti
 #define MAX_UTENTI 4 //numero massimo di utenti
+#define MAX_CARDS 20 //numero massimo di carte in una lavagna
 
 // Tempo dopo il quale una card in "Doing" riceve un PING (90 secondi) 
 #define TIMEOUT_PING_SECONDS 90     

@@ -13,7 +13,8 @@ definire una struttura comune ad essi, utile allo scambio dei dati*/
 typedef enum{
     TODO,
     DOING,
-    DONE
+    DONE,
+    EMPTY //indica che la carta non è ancora stata creata
 } ColumnType;
 
 // Tipo che rappresenta una card
@@ -28,17 +29,5 @@ typedef struct{
     Card* next; // puntatore alla prossima carta della coda
 
 } Card;
-
-// Tipo che rappresenta la lavagna
-typedef struct{
-    int id;
-    /* vettore di 3 puntatori a card, implementa 3 code (TODO,DOING,DONE) di card, utile per evitare di allocare spazio non 
-    necessario e gestire comodamente l'ordine di arrivo */
-    Card* col[3]; 
-
-    Card all[10]; //vettore di Card che contiene tutte le card della lavagna
-
-
-} Lavagna;
 
 #endif
