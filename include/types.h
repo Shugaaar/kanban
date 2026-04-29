@@ -18,7 +18,7 @@ typedef enum{
 } ColumnType;
 
 // Tipo che rappresenta una card
-typedef struct{
+struct Card{
     int id;
     ColumnType col;  //collocazione della carta
     char text[MAX_TEXT_LEN]; //descrizione attività
@@ -26,8 +26,8 @@ typedef struct{
     int user_port;  //num di porta dell'utente 
     time_t timestamp; //ts ultima modifica
 
-    Card* next; // puntatore alla prossima carta della coda
+    struct Card* next; // puntatore alla prossima carta della coda
 
-} Card;
+};
 
 #endif

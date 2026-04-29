@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -35,10 +36,10 @@ typedef struct{
 
     /** vettore di 3 puntatori a card, implementa 3 code (TODO,DOING,DONE) di card, utile per evitare di allocare spazio non 
     necessario e gestire comodamente l'ordine di arrivo */
-    Card* col[3]; 
+    struct Card* col[3]; 
 
     /** vettore di Card che contiene tutte le card della lavagna */
-    Card cards[MAX_CARDS];
+    struct Card cards[MAX_CARDS];
 
 
 } Lavagna;
@@ -50,8 +51,8 @@ Lavagna l;
  * @param carta da aggiungere
  * @return 0 se la carta esiste già, 1 altrimenti
  */
-bool add_card(Card carta){
-    Card* c=&l.cards[carta.id];
+bool add_card(struct Card carta){
+    struct Card* c=&l.cards[carta.id];
     if(c->col!=EMPTY)
         return 0;
     
@@ -73,14 +74,14 @@ bool add_card(Card carta){
  */
 void extract_card(int id,ColumnType col){
     //classico codice di rimozione da una coda
-    Card* head=l.col[col];
-    Card* c=&l.cards[id];
+    struct Card* head=l.col[col];
+    struct Card* c=&l.cards[id];
     if(head->id==id){
         head=NULL;
         return;
     }
-    Card* prev;
-    Card* cur;
+    struct Card* prev;
+    struct Card* cur;
     for(cur=head;cur->id!=id&&cur!=NULL;cur=cur->next){
         prev=cur;
     }
@@ -96,7 +97,7 @@ void extract_card(int id,ColumnType col){
  * @return 0 se la carta non esisteva, 1 altrimenti
  */
 bool move_card(int id,ColumnType col){
-    Card* c=&l.cards[id];
+    struct Card* c=&l.cards[id];
 
     if(c->col==EMPTY)   
         return 0;
@@ -107,7 +108,7 @@ bool move_card(int id,ColumnType col){
     l.col[col]=c;
     //aggiorno la carta
     c->col=col;
-    c->timestamp=Time(NULL);
+    c->timestamp=time(NULL);
 
     return 1;
 }
@@ -117,7 +118,7 @@ bool move_card(int id,ColumnType col){
  */
 void init_lavagna(){
     l.id=1;
-    l.col[0]=l.col[1]=l.col[2]=0xFFFFFFFF;
+    l.col[0]=l.col[1]=l.col[2]=NULL;
 
     //inizializzo il doing a -1, il che indica che gli uetnti non stanno eseguendo alcuna attività
     for(int i=0;i<MAX_UTENTI;i++){
@@ -126,10 +127,10 @@ void init_lavagna(){
 
     //creo alcune carte di esempio
     for(int i=0;i<5;i++){
-        char text[]="attività #"+i;
+        //char text[256]="attività #"+i;
 
-        Card c;
-        create_card(&c,i,0,text);
+        struct Card c;
+        create_card(&c,i,TODO,"attività #"+i);
         add_card(c);
     }
 
@@ -173,9 +174,9 @@ void print_lavagna(){
         printf("-");
     }
 
-    Card* todo=l.col[0];
-    Card* doing=l.col[1];
-    Card* done=l.col[2];
+    struct Card* todo=l.col[0];
+    struct Card* doing=l.col[1];
+    struct Card* done=l.col[2];
 
     while(todo||doing||done){
 
@@ -200,7 +201,7 @@ void print_lavagna(){
  * @brief gestisce l'invio dell'AVAILABLE_CARD
  * (l'ho reso una funzione in quanto dev'essere chiamato in porzioni diverse di codice)
  */
-void AVAILABLE_CARD(int sockfd){
+void available_card(int sockfd){
     int reg[n_users];
     int j=0;
     for(int i=0;i<MAX_UTENTI&&j<n_users;i++){
@@ -264,12 +265,12 @@ int main(){
     while(1){
         Packet rcv_pkt;
         struct sockaddr_in host_addr;
-        size_t host_addr_len;
+        socklen_t host_addr_len;
         recvfrom(sockfd,&rcv_pkt,sizeof(Packet),0,(struct sockaddr*)&host_addr,&host_addr_len);
 
         switch(rcv_pkt.cmd){
 
-            case(HELLO):
+            case(HELLO):{
                 //salvo la porta e aggiorno il contatore
                 int port=rcv_pkt.sender_port;
                 ports[port-USER_START_PORT]=port;
@@ -279,10 +280,12 @@ int main(){
 
                 //se ci sono almeno due utenti mando l'AVAILABLE_CARD
                 if(n_users >=2){
-                    AVAILABLE_CARD(sockfd);
+                    available_card(sockfd);
                 }
-            
-            case(QUIT):
+                break;
+            }
+                     
+            case(QUIT):{
                 //rimuovo la porta dall'array e aggiorno il contatore
                 int port=rcv_pkt.sender_port;
                 ports[port-USER_START_PORT]=0;
@@ -293,8 +296,10 @@ int main(){
                     move_card(doing[port-USER_START_PORT],TODO);
                     //se ci sono almeno due utenti mando l'available card
                 }
-            
-            case(ACK_CARD):
+                break;
+            }
+                        
+            case(ACK_CARD):{
                 //salvo in doing l'id della carta
                 doing[rcv_pkt.sender_port-USER_START_PORT]=rcv_pkt.card.id;
                 //sposto la carta nella colonna DOING
@@ -302,8 +307,10 @@ int main(){
                 print_lavagna();
 
                 printf("Carta di id: %i assegnata all'utente %i\n",rcv_pkt.card.id,rcv_pkt.sender_port);
-            
-            case(CARD_DONE):
+                break;
+            }
+                         
+            case(CARD_DONE):{
                 //setto a -1 il doing dell'utente
                 doing[rcv_pkt.sender_port-USER_START_PORT]=-1;
                 //sposto la carta nella colonna DONE
@@ -314,14 +321,18 @@ int main(){
 
                 //se ci sono almeno 2 utenti chiamo l'AVAILABLE_CARD in quanto l'utente ha terminato una carta
                 if(n_users >=2){
-                    AVAILABLE_CARD(sockfd);
+                    available_card(sockfd);
                 }
-            
-            case(CREATE_CARD):
+                break;
+            }
+                         
+            case(CREATE_CARD):{
                 //aggiungo la carta alla lavagna
                 add_card(rcv_pkt.card);
                 print_lavagna();
-                
+                break;
+            }
+                         
         }
     }
 

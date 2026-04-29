@@ -20,19 +20,19 @@ void send_packet(int socket,Packet *p,struct sockaddr_in *dest){
  * @brief assegna i parametri passati alla carta
  * @param puntatore alla carta
  */
-void create_card(Card* c,int id,ColumnType col,const char text[256]){
+void create_card(struct Card* c,int id,ColumnType col,const char text[256]){
     c->id=id;
     c->col=col;
     c->user_port=0;
     strcpy(c->text,text);
-    c->next=0xFFFFFFFF;
+    c->next=NULL;
     c->timestamp=time(NULL);
 }
 
 /**
  * @brief copia la carta src in dst
  */
-void copy_card(Card src,Card* dst){
+void copy_card(struct Card src,struct Card* dst){
     dst->col=src.col;
     dst->id=src.id;
     dst->next=src.next;
@@ -44,14 +44,14 @@ void copy_card(Card src,Card* dst){
 /**
  * @brief fornisce una rappresentazione grafica su terminale della carta
  */
-void print_card(Card c){ 
+void print_card(struct Card c){ 
     int len=strlen(c.text);
     for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
         printf("-");
     }
     printf("\n");
     printf("ID: %i\n\n",c.id);
-    printf('"');
+    printf("""");
     for(int i=0;i<len;i++){
         if(i%WIDTH_LAVAGNA==0){
             printf("-  ");
@@ -61,7 +61,7 @@ void print_card(Card c){
         }
         printf("%c",c.text[i]);
     }
-    printf('"\n');
+    printf("\n");
     for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
         printf("-");
     }
