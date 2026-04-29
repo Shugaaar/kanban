@@ -42,10 +42,10 @@ int main(int argc,char* argv[]){
         return 1;
     }
     
-    //creo il socket della lavagna
+    //creo l'indirizzo della lavagna
     struct sockaddr_in server_addr;
     server_addr.sin_family=AF_INET;
-    server_addr.sin_port=htons(LAVAGNA_PORT);
+    server_addr.sin_port=htons(SERVER_PORT);
     inet_pton(AF_INET,SERVER_IP,&server_addr.sin_addr); //converto e assegno l'ip al socket della lavagna
 
     //creo il pacchetto per mandare l'HELLO

@@ -5,8 +5,8 @@
 unico aiuta all'eventuale modifica di questi ultimi*/
 
 #define SERVER_IP "127.0.0.1"       
-#define LAVAGNA_PORT 5678 // Porta della lavagna 
-#define UTENTE_PORT_START 5679 // Porta iniziale per gli utenti
+#define SERVER_PORT 5678 // Porta della lavagna 
+#define USER_START_PORT 5679 // Porta iniziale per gli utenti
 #define MAX_UTENTI 4 //numero massimo di utenti
 #define MAX_CARDS 20 //numero massimo di carte in una lavagna
 

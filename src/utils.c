@@ -1,12 +1,25 @@
 #include "../include/protocol.h"
 #include <string.h>
 
-//funzione generica condivisa tra server e client per inviare un pacchetto
+/*
+Questo modulo contiene funzioni utili per entrami i moduli utente e lavagna e quindi è giusto che siano messe a comune 
+evitando ridondanze di codice
+*/
+
+/**
+ * @brief invia un pacchetto generico supportato dal programma
+ * @param socket di invio
+ * @param puntatore al pacchetto da inviare
+ * @param indirizzo di destinazione
+ */
 void send_packet(int socket,Packet *p,struct sockaddr_in *dest){
     sendto(socket,p,sizeof(Packet),0,(struct sockaddr*) dest,sizeof(dest));
 }
 
-//assegna i parametri alla carta puntata da c
+/**
+ * @brief assegna i parametri passati alla carta
+ * @param puntatore alla carta
+ */
 void create_card(Card* c,int id,ColumnType col,const char text[256]){
     c->id=id;
     c->col=col;
@@ -16,7 +29,9 @@ void create_card(Card* c,int id,ColumnType col,const char text[256]){
     c->timestamp=time(NULL);
 }
 
-//copia la carta src in dst
+/**
+ * @brief copia la carta src in dst
+ */
 void copy_card(Card src,Card* dst){
     dst->col=src.col;
     dst->id=src.id;
@@ -26,7 +41,9 @@ void copy_card(Card src,Card* dst){
     dst->user_port=src.user_port;
 }
 
-//fornisce una rappresentazione grafica della carta
+/**
+ * @brief fornisce una rappresentazione grafica su terminale della carta
+ */
 void print_card(Card c){ 
     int len=strlen(c.text);
     for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
@@ -51,61 +68,3 @@ void print_card(Card c){
     printf("\n\n");
 }
 
-//fornisce una rappresentazione grafica della lavagna
-void print_lavagna(Lavagna l){
-
-    for(int i=0;i<WIDTH_LAVAGNA+4;i++){
-        printf("-");
-    }
-    printf("\n   LAVAGNA - ID:%i\n",l.id);
-
-    for(int i=0;i<WIDTH_LAVAGNA+4;i++){
-        printf("-");
-    }
-    char s1[]="    To Do";
-    printf("%s",s1);
-    for(int i=0;i< (WIDTH_LAVAGNA/3)-strlen(s1);i++){
-        printf(" ");
-    }
-    printf("--");
-
-    char s2[]="    Doing";
-    printf("%s",s2);
-    for(int i=0;i< (WIDTH_LAVAGNA/3)-strlen(s2);i++){
-        printf(" ");
-    }
-    printf("--");
-
-    char s3[]="    Done";
-    printf("%s",s3);
-    for(int i=0;i< (WIDTH_LAVAGNA/3)-strlen(s3);i++){
-        printf(" ");
-    }
-    printf("-\n\n");
-
-    for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
-        printf("-");
-    }
-
-    Card* todo=l.col[0];
-    Card* doing=l.col[1];
-    Card* done=l.col[2];
-
-    while(todo||doing||done){
-
-        if(todo){
-            print_card(*todo);
-            todo=todo->next;
-        }
-        if(doing){
-            print_card(*doing);
-            doing=doing->next;
-        }
-        if(done){
-            print_card(*done);
-            done=done->next;
-        }
-
-    }
-
-}
