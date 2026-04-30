@@ -209,13 +209,26 @@ void print_lavagna(){
 }
 
 /**
+ * @brief segnala che è in corso un ciclo di available_card, necessario 
+ * a evitare di coinvolgere utenti che si sono registrati mentre la procedura era in corso;
+ * 
+ * viene settato in AVAILABLE_CARD e resettato in ACK_CARD
+ */
+bool doing_available=false;
+
+/**
  * @brief gestisce l'invio dell'AVAILABLE_CARD
  * (l'ho reso una funzione in quanto dev'essere chiamato in porzioni diverse di codice)
  */
 void available_card(int sockfd){
-    while(l.col[TODO]==NULL){
-        sleep(5);
+
+    //segnalo l'inizio della procedura available_card
+    doing_available=true;
+
+    //se non ci sono task da svolgere ritorno
+    if(l.col[TODO]==NULL){
         printf("Nessun task da svolgere...\n");
+        return;
     }
     int reg[n_users];
 
@@ -257,7 +270,7 @@ void available_card(int sockfd){
         send_packet(sockfd,&av_pkt,&host_addr);
     }
 
-    //torno al loop in modo da mettermi in ascolto per la ricezione di ACK_CARD e di eventuali CARD_DONE o altro
+    //torno al loop in modo da mettermi in ascolto per la ricezione di ACK_CARD
 }
 
 int main(){
@@ -305,8 +318,8 @@ int main(){
 
                 printf("Utente porta: %i registrato.\nNumero utenti:%i\n",port,n_users);
 
-                //se ci sono almeno due utenti mando l'AVAILABLE_CARD
-                if(n_users >=2){
+                //se ci sono almeno due utenti e non è già in corso un available_card mando l'AVAILABLE_CARD
+                if(n_users >=2&&!doing_available){
                     available_card(sockfd);
                 }
                 break;
@@ -327,6 +340,8 @@ int main(){
             }
                         
             case(ACK_CARD):{
+                //disabilito la procedura available_card
+                doing_available=false;
                 //salvo in doing l'id della carta
                 doing[rcv_pkt.sender_port-USER_START_PORT]=rcv_pkt.card.id;
                 //sposto la carta nella colonna DOING

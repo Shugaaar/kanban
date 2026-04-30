@@ -18,7 +18,7 @@ void send_packet(int socket,Packet *p,struct sockaddr_in *dest){
     if(sent<0){
         perror("Errore send_packet");
     }else{
-        printf("Inviati %i byte\n",sent);
+        //printf("Inviati %i byte\n",sent);
     }
 }
 
