@@ -223,6 +223,7 @@ void available_card(int sockfd){
 
     //creo l'indirizzo generico (senza porta)
     struct sockaddr_in host_addr;
+    memset(&host_addr, 0, sizeof(host_addr));
     host_addr.sin_family=AF_INET;
     inet_pton(AF_INET,SERVER_IP,&host_addr.sin_addr);
 
@@ -255,6 +256,7 @@ int main(){
 
     //assegno un indirizzo al socket
     struct sockaddr_in my_addr;
+    memset(&my_addr, 0, sizeof(my_addr));
     my_addr.sin_family=AF_INET;
     inet_pton(AF_INET,SERVER_IP,&my_addr.sin_addr);
     my_addr.sin_port=htons(SERVER_PORT);
@@ -270,6 +272,8 @@ int main(){
     while(1){
         Packet rcv_pkt;
         struct sockaddr_in host_addr;
+        memset(&host_addr, 0, sizeof(host_addr));
+        
         socklen_t host_addr_len;
         recvfrom(sockfd,&rcv_pkt,sizeof(Packet),0,(struct sockaddr*)&host_addr,&host_addr_len);
 

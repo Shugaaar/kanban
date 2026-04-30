@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -11,29 +12,40 @@
 #include "../include/protocol.h"
 #include "utils.c"
 
+
+
+int costs[MAX_UTENTI-1]; //costi ricevuti dagli altri utenti
+int n_peer_remaining; //counter di peer da cui ricevere ancora il costo
+int n_peer=0; //numero di peer da contattare dopo AVAILABLE_CARD
+int my_cost; //costo calcolato randomicamente
+
+struct Card doing; //se id!=-1 corrisponde alla carta che sto eseguendo
+
+
+
 int main(int argc,char* argv[]){
     if(argc !=2){
         fprintf(stderr,"Uso: %s [porta utente]\n",argv[0]);
         return 1;
     }
     int my_port=atoi(argv[1]);
-    if(my_port<UTENTE_PORT_START||my_port>UTENTE_PORT_START+MAX_UTENTI){
-        fprintf(stderr,"La porta utente dev'essere compresa tra %i e %i\n",UTENTE_PORT_START,UTENTE_PORT_START+MAX_UTENTI);
+    if(my_port<USER_START_PORT||my_port>USER_START_PORT+MAX_UTENTI){
+        fprintf(stderr,"La porta utente dev'essere compresa tra %i e %i\n",USER_START_PORT,USER_START_PORT+MAX_UTENTI);
         return 1;
     }
 
-    int sockfd;
-
     //creo il socket di tipo UDP
-    if(sockfd=socket(AF_INET,SOCK_DGRAM,0)<0){
+    int sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    if(sockfd<0){
         perror("Errore durante la creazione del socket\n");
         return 1;
     }
 
     //assegno un indirizzo al socket
     struct sockaddr_in my_addr;
+    memset(&my_addr, 0, sizeof(my_addr));
     my_addr.sin_family=AF_INET;
-    my_addr.sin_addr.s_addr=INADDR_ANY;
+    inet_pton(AF_INET,SERVER_IP,&my_addr.sin_addr);
     my_addr.sin_port=htons(my_port);
 
     if(bind(sockfd,(struct sockaddr*)&my_addr,sizeof(my_addr))<0){
@@ -44,6 +56,7 @@ int main(int argc,char* argv[]){
     
     //creo l'indirizzo della lavagna
     struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family=AF_INET;
     server_addr.sin_port=htons(SERVER_PORT);
     inet_pton(AF_INET,SERVER_IP,&server_addr.sin_addr); //converto e assegno l'ip al socket della lavagna
@@ -53,18 +66,9 @@ int main(int argc,char* argv[]){
     pkt.cmd=HELLO;
     pkt.sender_port=my_port;
     send_packet(sockfd,&pkt,&server_addr);
-    printf("Utente porta %d: Registrato alla lavagna.\n", my_port);
+    printf("Utente porta %d: Registrazione alla lavagna...\n", my_port);
 
     //DEVO CREARE UNA VERIFICA CHE L'HELLO SIA ARRIVATO
-
-    printf("Utente porta %d: Registrato alla lavagna.\n", my_port);
-
-    int costs[MAX_UTENTI-1]; //costi ricevuti dagli altri utenti
-    int n_peer_remaining; //counter di peer da cui ricevere ancora il costo
-    int n_peer; //numero di peer da contattare dopo AVAILABLE_CARD
-    int my_cost; //costo calcolato randomicamente
-
-    Card doing; //se id!=-1 corrisponde alla carta che sto eseguendo
 
     while(1){ //loop principale, attendo che arrivi un pacchetto e agisco di conseguenza
 
@@ -81,11 +85,10 @@ int main(int argc,char* argv[]){
 
         switch(rcv_pkt.cmd){
 
-            case AVAILABLE_CARD:
-
+            case AVAILABLE_CARD:{
                 printf("Ricevuta card disponibile, id:%i",rcv_pkt.card.id);
                 
-                copy_card(rcv_pkt.card,doing);//salvo i dati della carta
+                copy_card(rcv_pkt.card,&doing);//salvo i dati della carta
                 srand(time(NULL));
                 my_cost=rand(); //genero il costo randomico
 
@@ -103,9 +106,10 @@ int main(int argc,char* argv[]){
                     host_addr.sin_port=rcv_pkt.users_ports[i];
                     send_packet(sockfd,&cost_pkt,&host_addr);
                 }
+                break;
+            }
 
-            case CHOOSE_USER:
-
+            case CHOOSE_USER:{
                 costs[n_peer-n_peer_remaining]=rcv_pkt.cost; //salvo il costo ricevuto
                 n_peer_remaining--;
                 int chosen=1;
@@ -128,7 +132,8 @@ int main(int argc,char* argv[]){
                         //una volta ricevuto il task abilito il terminale all'host in modo che possa segnalare un CARD_DONE o un QUIT alla lavagna
 
                         while(1){
-                            char cmd[]=scanf("Inserire un comando:\n");
+                            char cmd[256];
+                            scanf("Inserire un comando: %s\n",cmd);
                             if(strcmp(cmd,"CARD_DONE")){
                                 Packet done_pkt;
                                 done_pkt.cmd=CARD_DONE;
@@ -148,6 +153,9 @@ int main(int argc,char* argv[]){
                         }        
                     }
                 }
+                break;
+            }
+                
         }
 
 
