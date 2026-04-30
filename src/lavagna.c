@@ -77,7 +77,7 @@ void extract_card(int id,ColumnType col){
     struct Card* head=l.col[col];
     struct Card* c=&l.cards[id];
     if(head->id==id){
-        head=NULL;
+        l.col[col]=head->next;
         return;
     }
     struct Card* prev;
@@ -102,7 +102,6 @@ bool move_card(int id,ColumnType col){
     if(c->col==EMPTY)   
         return 0;
     //estraggo la carta dalla precedente coda
-    printf("Extract\n");
     extract_card(id,c->col);
     //aggiorno la testa della nuova coda
     c->next=l.col[col]; 
@@ -131,9 +130,10 @@ void init_lavagna(){
         doing[i]=-1;
     }
 
-    //inizializzo l'array di carte della lavagna a EMPTY
+    //inizializzo l'array di carte della lavagna
     for(int i=0;i<MAX_CARDS;i++){
         l.cards[i].col=EMPTY;
+        l.cards[i].next=NULL;
     }
 
     //creo alcune carte di esempio
@@ -213,6 +213,10 @@ void print_lavagna(){
  * (l'ho reso una funzione in quanto dev'essere chiamato in porzioni diverse di codice)
  */
 void available_card(int sockfd){
+    while(l.col[TODO]==NULL){
+        sleep(5);
+        printf("Nessun task da svolgere...\n");
+    }
     int reg[n_users];
 
     for(int i=0,j=0;j<n_users;i++){ //salvo in un array tutti gli utenti registrati

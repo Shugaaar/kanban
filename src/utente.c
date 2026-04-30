@@ -96,7 +96,7 @@ int main(int argc,char* argv[]){
                 printf("Ricevuta card disponibile, id:%i\n",rcv_pkt.card.id);
                 
                 copy_card(rcv_pkt.card,&doing);//salvo i dati della carta
-                srand(time(NULL));
+                srand(time(NULL) ^ my_port); //ho aggiunto lo xor con my_port perchè sennò usciva lo steso costo per ogni utente
                 my_cost=rand(); //genero il costo randomico , non so pk ma risulta lo stesso in tutti gli utenti
                 printf("Costo generato: %i\n",my_cost);
 
@@ -149,11 +149,26 @@ int main(int argc,char* argv[]){
                         print_card(doing);
 
                         Packet ack_pkt;
+                        memset(&ack_pkt,0,sizeof(Packet));
                         ack_pkt.cmd=ACK_CARD;
+                        ack_pkt.sender_port=my_port;
+                        copy_card(doing,&ack_pkt.card);
                         send_packet(sockfd,&ack_pkt,&server_addr);
+
+                        sleep(10);
+
+                        //dopo 10 secondi mando il CARD_DONE
+
+                        Packet done_pkt;
+                        memset(&done_pkt,0,sizeof(Packet));
+                        done_pkt.cmd=CARD_DONE;
+                        done_pkt.sender_port=my_port;
+                        copy_card(doing,&done_pkt.card);
+                        send_packet(sockfd,&done_pkt,&server_addr);
 
                         //una volta ricevuto il task abilito il terminale all'host in modo che possa segnalare un CARD_DONE o un QUIT alla lavagna
 
+                        /* PER ORA LO RIMUOVO IN QUANTO NON SO SE é GIUSTO
                         while(1){
                             char cmd[256];
                             scanf("Inserire un comando: %s\n",cmd);
@@ -173,7 +188,8 @@ int main(int argc,char* argv[]){
                             }else{
                                 printf("Comando non valido...\n");
                             }
-                        }        
+                        }   
+                        */     
                     }
                 }
                 break;
