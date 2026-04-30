@@ -13,7 +13,13 @@ evitando ridondanze di codice
  * @param indirizzo di destinazione
  */
 void send_packet(int socket,Packet *p,struct sockaddr_in *dest){
-    sendto(socket,p,sizeof(Packet),0,(struct sockaddr*) dest,sizeof(dest));
+    printf("Invio %s a %s:%i\n",command_names[p->cmd],inet_ntoa(dest->sin_addr), ntohs(dest->sin_port));
+    int sent= sendto(socket,p,sizeof(Packet),0,(struct sockaddr*) dest,sizeof(struct sockaddr_in));
+    if(sent<0){
+        perror("Errore send_packet");
+    }else{
+        printf("Inviati %i byte\n",sent);
+    }
 }
 
 /**

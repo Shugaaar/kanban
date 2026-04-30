@@ -15,6 +15,8 @@
 
 
 int costs[MAX_UTENTI-1]; //costi ricevuti dagli altri utenti
+int peer_ports[MAX_UTENTI-1]; //array che per ogni i indica la porta di colui che ha costs[i], serve solo per scegliere sul numero di porta in caso di parità di costo
+
 int n_peer_remaining; //counter di peer da cui ricevere ancora il costo
 int n_peer=0; //numero di peer da contattare dopo AVAILABLE_CARD
 int my_cost; //costo calcolato randomicamente
@@ -45,7 +47,7 @@ int main(int argc,char* argv[]){
     struct sockaddr_in my_addr;
     memset(&my_addr, 0, sizeof(my_addr));
     my_addr.sin_family=AF_INET;
-    inet_pton(AF_INET,SERVER_IP,&my_addr.sin_addr);
+    my_addr.sin_addr.s_addr=htonl(INADDR_ANY);
     my_addr.sin_port=htons(my_port);
 
     if(bind(sockfd,(struct sockaddr*)&my_addr,sizeof(my_addr))<0){
@@ -63,10 +65,14 @@ int main(int argc,char* argv[]){
 
     //creo il pacchetto per mandare l'HELLO
     Packet pkt;
+    memset(&pkt, 0, sizeof(Packet)); //pulisco i dati occupati dal pacchetto
     pkt.cmd=HELLO;
     pkt.sender_port=my_port;
-    send_packet(sockfd,&pkt,&server_addr);
-    printf("Utente porta %d: Registrazione alla lavagna...\n", my_port);
+
+    
+    send_packet(sockfd, &pkt, &server_addr);
+
+    printf("Utente porta %d: Registrato alla lavagna\n", my_port);
 
     //DEVO CREARE UNA VERIFICA CHE L'HELLO SIA ARRIVATO
 
@@ -86,7 +92,7 @@ int main(int argc,char* argv[]){
         switch(rcv_pkt.cmd){
 
             case AVAILABLE_CARD:{
-                printf("Ricevuta card disponibile, id:%i",rcv_pkt.card.id);
+                printf("Ricevuta card disponibile, id:%i\n",rcv_pkt.card.id);
                 
                 copy_card(rcv_pkt.card,&doing);//salvo i dati della carta
                 srand(time(NULL));
@@ -94,16 +100,18 @@ int main(int argc,char* argv[]){
 
                 //creo il pacchetto con il mio costo
                 Packet cost_pkt;
+                memset(&cost_pkt,0,sizeof(Packet));
                 cost_pkt.cmd=CHOOSE_USER;
                 cost_pkt.cost=my_cost;
+                cost_pkt.sender_port=my_port;
 
                 struct sockaddr_in host_addr;
                 host_addr.sin_family=AF_INET;
-                host_addr.sin_addr.s_addr=INADDR_ANY;
-                n_peer_remaining=rcv_pkt.n_users; // aggiorno il counter di costi da ricevere
+                inet_pton(AF_INET,SERVER_IP,&host_addr.sin_addr);
+                n_peer_remaining=rcv_pkt.n_users-1; // aggiorno il counter di costi da ricevere
 
-                for(int i=0;i<rcv_pkt.n_users;i++){ //spedisco il costo ai vari peer
-                    host_addr.sin_port=rcv_pkt.users_ports[i];
+                for(int i=0;i<rcv_pkt.n_users-1;i++){ //spedisco il costo ai vari peer
+                    host_addr.sin_port=htons(rcv_pkt.users_ports[i]);
                     send_packet(sockfd,&cost_pkt,&host_addr);
                 }
                 break;
@@ -111,6 +119,7 @@ int main(int argc,char* argv[]){
 
             case CHOOSE_USER:{
                 costs[n_peer-n_peer_remaining]=rcv_pkt.cost; //salvo il costo ricevuto
+                peer_ports[n_peer-n_peer_remaining]=rcv_pkt.sender_port;
                 n_peer_remaining--;
                 int chosen=1;
                 if(!n_peer_remaining){ 
@@ -118,6 +127,13 @@ int main(int argc,char* argv[]){
                         if(my_cost>costs[i]){
                             chosen=0;
                             doing.id=-1;
+                            break;
+                        }else if(my_cost==costs[i]){ //se ho il costo uguale a qualcun'altro e ho porta maggiore non posso essere il chosen
+                            if(my_port>peer_ports[i]){
+                                chosen=0;
+                                doing.id=-1;
+                                break;
+                            }
                         }
                     }
                     if(chosen){ // se sono il chosen mando alla lavagna l'ACK_CARD

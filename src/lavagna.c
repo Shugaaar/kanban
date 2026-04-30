@@ -102,6 +102,7 @@ bool move_card(int id,ColumnType col){
     if(c->col==EMPTY)   
         return 0;
     //estraggo la carta dalla precedente coda
+    printf("Extract\n");
     extract_card(id,c->col);
     //aggiorno la testa della nuova coda
     c->next=l.col[col]; 
@@ -119,6 +120,11 @@ bool move_card(int id,ColumnType col){
 void init_lavagna(){
     l.id=1;
     l.col[0]=l.col[1]=l.col[2]=NULL;
+
+    //inizializzo l'array di porte
+    for(int i=0;i<MAX_UTENTI;i++){
+        ports[i]=0;
+    }
 
     //inizializzo il doing a -1, il che indica che gli utenti non stanno eseguendo alcuna attività
     for(int i=0;i<MAX_UTENTI;i++){
@@ -208,18 +214,22 @@ void print_lavagna(){
  */
 void available_card(int sockfd){
     int reg[n_users];
-    int j=0;
-    for(int i=0;i<MAX_UTENTI&&j<n_users;i++){
-        if(ports[i]==0)
+
+    for(int i=0,j=0;j<n_users;i++){ //salvo in un array tutti gli utenti registrati
+        if(ports[i]==0) //se ha valore 0 non è ancora registrato
             continue;
         reg[j]=ports[i];
+        //printf("%i\n",reg[j]);  //debug
         j++;
     }
 
     //creo il pacchetto
     Packet av_pkt;
+    memset(&av_pkt,0,sizeof(Packet)); //pulisco il pacchetto
     av_pkt.cmd=AVAILABLE_CARD;
     av_pkt.n_users=n_users;
+
+    av_pkt.card=*l.col[TODO]; //metto la carta in cima a TODO nel pacchetto
 
     //creo l'indirizzo generico (senza porta)
     struct sockaddr_in host_addr;
@@ -230,13 +240,17 @@ void available_card(int sockfd){
     //per ogni utente registrato modifico il pacchetto inserendo la lista degli altri utenti registrati, modifico l'indirizzo e invio 
     for(int i=0;i<n_users;i++){
         for(int j=0,J=0;J<n_users;j++,J++){
-            if(J==i){
+            if(J==i){ //se J corrisponde all'utente a cui devo inviare salta di una posizione nell'array regs
                 J++;
+                if(J==n_users) //se J ha già superato il num di utenti interrompi il ciclo
+                    break;
             }
             av_pkt.users_ports[j]=reg[J];
+            //printf("%i\n",av_pkt.users_ports[j]); //debug
         }
         host_addr.sin_port=htons(reg[i]);
-        send_packet(sockfd,&av_pkt,&host_addr);   
+        
+        send_packet(sockfd,&av_pkt,&host_addr);
     }
 
     //torno al loop in modo da mettermi in ascolto per la ricezione di ACK_CARD e di eventuali CARD_DONE o altro
@@ -285,7 +299,7 @@ int main(){
                 ports[port-USER_START_PORT]=port;
                 n_users++;
 
-                printf("Utente porta: %i registrato...\n Numero utenti:%i\n",port,n_users);
+                printf("Utente porta: %i registrato.\nNumero utenti:%i\n",port,n_users);
 
                 //se ci sono almeno due utenti mando l'AVAILABLE_CARD
                 if(n_users >=2){

@@ -25,13 +25,29 @@
 
  }Command;
 
+ //array di stringhe associate alla enum Command, utile per stampare l'invio dei comandi
+ const char* command_names[]={
+    "CREATE_CARD", 
+    "HELLO",  
+    "QUIT", 
+    "PONG_LAVAGNA", 
+    "CHOOSE_USER", 
+    "ACK_CARD", 
+    "CARD_DONE", 
+    "MOVE_CARD", 
+    "SHOW_LAVAGNA", 
+    "SEND_USER_LIST", 
+    "PING_USER", 
+    "AVAILABLE_CARD" 
+ };
+
  typedef struct {
 
    Command cmd; //tipo di comando
    int sender_port; //porta del sender
 
    //UTENTI
-   Card card; //card creata con CREATE_CARD
+   struct Card card; //card creata con CREATE_CARD
    int cost; //costo dell'utente
 
    //LAVAGNA
