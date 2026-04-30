@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include <sys/types.h>
 #include <arpa/inet.h>
@@ -96,7 +97,8 @@ int main(int argc,char* argv[]){
                 
                 copy_card(rcv_pkt.card,&doing);//salvo i dati della carta
                 srand(time(NULL));
-                my_cost=rand(); //genero il costo randomico
+                my_cost=rand(); //genero il costo randomico , non so pk ma risulta lo stesso in tutti gli utenti
+                printf("Costo generato: %i\n",my_cost);
 
                 //creo il pacchetto con il mio costo
                 Packet cost_pkt;
@@ -108,7 +110,8 @@ int main(int argc,char* argv[]){
                 struct sockaddr_in host_addr;
                 host_addr.sin_family=AF_INET;
                 inet_pton(AF_INET,SERVER_IP,&host_addr.sin_addr);
-                n_peer_remaining=rcv_pkt.n_users-1; // aggiorno il counter di costi da ricevere
+                n_peer=rcv_pkt.n_users-1; //aggiorno il numero di peer da gestire
+                n_peer_remaining=n_peer; // inizializzo il counter di costi da ricevere
 
                 for(int i=0;i<rcv_pkt.n_users-1;i++){ //spedisco il costo ai vari peer
                     host_addr.sin_port=htons(rcv_pkt.users_ports[i]);
@@ -119,18 +122,22 @@ int main(int argc,char* argv[]){
 
             case CHOOSE_USER:{
                 costs[n_peer-n_peer_remaining]=rcv_pkt.cost; //salvo il costo ricevuto
-                peer_ports[n_peer-n_peer_remaining]=rcv_pkt.sender_port;
+                printf("Costo ricevuto da %i: %i\n",rcv_pkt.sender_port,rcv_pkt.cost);
+                peer_ports[n_peer-n_peer_remaining]=rcv_pkt.sender_port; //salvo la porta ssociata al costo
                 n_peer_remaining--;
-                int chosen=1;
+
                 if(!n_peer_remaining){ 
+                    bool chosen=true;
                     for(int i=0;i<n_peer;i++){ //se il mio costo è maggiore di almeno un peer non sono il chosen
                         if(my_cost>costs[i]){
-                            chosen=0;
+                            chosen=false;
                             doing.id=-1;
                             break;
-                        }else if(my_cost==costs[i]){ //se ho il costo uguale a qualcun'altro e ho porta maggiore non posso essere il chosen
+                        }
+                        if(my_cost==costs[i]){ //se ho il costo uguale a qualcun'altro e ho porta maggiore non posso essere il chosen
+                            printf("SONO ENTRATO NEL CASO DI PARITA' DI COSTO\n");
                             if(my_port>peer_ports[i]){
-                                chosen=0;
+                                chosen=false;
                                 doing.id=-1;
                                 break;
                             }
