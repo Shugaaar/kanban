@@ -120,17 +120,22 @@ void init_lavagna(){
     l.id=1;
     l.col[0]=l.col[1]=l.col[2]=NULL;
 
-    //inizializzo il doing a -1, il che indica che gli uetnti non stanno eseguendo alcuna attività
+    //inizializzo il doing a -1, il che indica che gli utenti non stanno eseguendo alcuna attività
     for(int i=0;i<MAX_UTENTI;i++){
         doing[i]=-1;
     }
 
+    //inizializzo l'array di carte della lavagna a EMPTY
+    for(int i=0;i<MAX_CARDS;i++){
+        l.cards[i].col=EMPTY;
+    }
+
     //creo alcune carte di esempio
     for(int i=0;i<5;i++){
-        //char text[256]="attività #"+i;
-
+        char text[256];
+        sprintf(text,"Qua verrà visualizzato il testo della  attività #%i (sto aggiungendo lunghezza al testo per vedere come si comporta la stampa)\n",i);
         struct Card c;
-        create_card(&c,i,TODO,"attività #"+i);
+        create_card(&c,i,TODO,text);
         add_card(c);
     }
 
@@ -149,51 +154,51 @@ void print_lavagna(){
     for(int i=0;i<WIDTH_LAVAGNA+4;i++){
         printf("-");
     }
-    char s1[]="    To Do";
+    printf("\n\n");
+
+    char s1[]="--     To Do";
     printf("%s",s1);
-    for(int i=0;i< (WIDTH_LAVAGNA/3)-strlen(s1);i++){
+    for(int i=0;i< (WIDTH_LAVAGNA/3)-(int)sizeof(s1);i++){
         printf(" ");
     }
-    printf("--");
-
-    char s2[]="    Doing";
-    printf("%s",s2);
-    for(int i=0;i< (WIDTH_LAVAGNA/3)-strlen(s2);i++){
-        printf(" ");
-    }
-    printf("--");
-
-    char s3[]="    Done";
-    printf("%s",s3);
-    for(int i=0;i< (WIDTH_LAVAGNA/3)-strlen(s3);i++){
-        printf(" ");
-    }
-    printf("-\n\n");
-
-    for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
-        printf("-");
-    }
+    printf("--\n\n");
 
     struct Card* todo=l.col[0];
-    struct Card* doing=l.col[1];
-    struct Card* done=l.col[2];
-
-    while(todo||doing||done){
-
-        if(todo){
-            print_card(*todo);
-            todo=todo->next;
-        }
-        if(doing){
-            print_card(*doing);
-            doing=doing->next;
-        }
-        if(done){
-            print_card(*done);
-            done=done->next;
-        }
-
+    while(todo){
+        print_card(*todo);
+        todo=todo->next;
     }
+
+    char s2[]="--     Doing";
+    printf("%s",s2);
+    for(int i=0;i< (WIDTH_LAVAGNA/3)-(int)strlen(s2);i++){
+        printf(" ");
+    }
+    printf("--\n\n");
+
+    struct Card* doing=l.col[1];
+    while(doing){
+        print_card(*doing);
+        doing=doing->next;
+    }
+
+    char s3[]="--     Done";
+    printf("%s",s3);
+    for(int i=0;i< (WIDTH_LAVAGNA/3)-(int)strlen(s3);i++){
+        printf(" ");
+    }
+    printf("--\n\n");
+
+    struct Card* done=l.col[2];
+    while(done){
+        print_card(*done);
+        done=done->next;
+    }
+
+    for(int i=0;i<(WIDTH_LAVAGNA)+4;i++){
+        printf("-");
+    }
+    printf("\n");
 
 }
 
@@ -242,8 +247,8 @@ int main(){
     print_lavagna();
 
     //creo il socket UDP
-    int sockfd;
-    if(sockfd=socket(AF_INET,SOCK_DGRAM,0)<1){
+    int sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    if(sockfd<1){
         perror("Errore nella creazione del socket");
         return 1;
     }

@@ -46,23 +46,22 @@ void copy_card(struct Card src,struct Card* dst){
  */
 void print_card(struct Card c){ 
     int len=strlen(c.text);
-    for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
+    for(int i=0;i<(WIDTH_LAVAGNA/3);i++){
         printf("-");
     }
     printf("\n");
     printf("ID: %i\n\n",c.id);
-    printf("""");
     for(int i=0;i<len;i++){
         if(i%WIDTH_LAVAGNA==0){
-            printf("-  ");
+            
             printf("\n");
-            printf(". -");
+            printf("-  ");
 
         }
         printf("%c",c.text[i]);
     }
     printf("\n");
-    for(int i=0;i<(WIDTH_LAVAGNA/3)+4;i++){
+    for(int i=0;i<(WIDTH_LAVAGNA/3);i++){
         printf("-");
     }
     printf("\n\n");
