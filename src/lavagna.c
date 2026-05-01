@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include <sys/types.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -300,82 +301,114 @@ int main(){
 
     printf("Server in ascolto sulla porta %i...\n",SERVER_PORT);
 
+    //DEVO RICEVERE DATI SIA DA TASTIERA CHE DAL SOCKET, in modo da ricevere pacchetti e tenere abilitato il terminale 
+    //contemporaneamente, per fare ciò mi servo dell'IO MULTIPLEXING
+
+    fd_set fd_list; //creo la lista di file descriptor
+
     while(1){
-        Packet rcv_pkt;
-        struct sockaddr_in host_addr;
-        memset(&host_addr, 0, sizeof(host_addr));
-        
-        socklen_t host_addr_len;
-        recvfrom(sockfd,&rcv_pkt,sizeof(Packet),0,(struct sockaddr*)&host_addr,&host_addr_len);
 
-        switch(rcv_pkt.cmd){
+        //uso le macro per gestire la lista di fd
+        FD_ZERO(&fd_list);          // pulisco
+        FD_SET(sockfd, &fd_list);   // Aggiungo il socket
+        FD_SET(STDIN_FILENO, &fd_list); // Aggiungo la tastiera 
 
-            case(HELLO):{
-                //salvo la porta e aggiorno il contatore
-                int port=rcv_pkt.sender_port;
-                ports[port-USER_START_PORT]=port;
-                n_users++;
+        int max_fd = sockfd; //suppongo che il max sia il socket in quanto STDIN vale 0
 
-                printf("Utente porta: %i registrato.\nNumero utenti:%i\n",port,n_users);
-
-                //se ci sono almeno due utenti e non è già in corso un available_card mando l'AVAILABLE_CARD
-                if(n_users >=2&&!doing_available){
-                    available_card(sockfd);
-                }
-                break;
-            }
-                     
-            case(QUIT):{
-                //rimuovo la porta dall'array e aggiorno il contatore
-                int port=rcv_pkt.sender_port;
-                ports[port-USER_START_PORT]=0;
-                n_users--;
-
-                //sposto un eventuale carta in svolgimento dall'utente in TODO
-                if(doing[port-USER_START_PORT]!=-1){
-                    move_card(doing[port-USER_START_PORT],TODO);
-                    //se ci sono almeno due utenti mando l'available card
-                }
-                break;
-            }
-                        
-            case(ACK_CARD):{
-                //disabilito la procedura available_card
-                doing_available=false;
-                //salvo in doing l'id della carta
-                doing[rcv_pkt.sender_port-USER_START_PORT]=rcv_pkt.card.id;
-                //sposto la carta nella colonna DOING
-                move_card(rcv_pkt.card.id,DOING);
-                print_lavagna();
-
-                printf("Carta di id: %i assegnata all'utente %i\n",rcv_pkt.card.id,rcv_pkt.sender_port);
-                break;
-            }
-                         
-            case(CARD_DONE):{
-                //setto a -1 il doing dell'utente
-                doing[rcv_pkt.sender_port-USER_START_PORT]=-1;
-                //sposto la carta nella colonna DONE
-                move_card(rcv_pkt.card.id,DONE);
-                print_lavagna();
-
-                printf("Carta di id: %i completata\n",rcv_pkt.card.id);
-
-                //se ci sono almeno 2 utenti chiamo l'AVAILABLE_CARD in quanto l'utente ha terminato una carta
-                if(n_users >=2){
-                    available_card(sockfd);
-                }
-                break;
-            }
-                         
-            case(CREATE_CARD):{
-                //aggiungo la carta alla lavagna
-                add_card(rcv_pkt.card);
-                print_lavagna();
-                break;
-            }
-                         
+        if (select(max_fd + 1, &fd_list, NULL, NULL, NULL) < 0) { //mi metto in attesa su entrambi i fronti
+            perror("Errore nella select");
+            return 1;
         }
+
+        if(FD_ISSET(sockfd,&fd_list)){ //se è arrivato un pacchetto
+
+            Packet rcv_pkt;
+            struct sockaddr_in host_addr;
+            memset(&host_addr, 0, sizeof(host_addr));
+        
+            socklen_t host_addr_len;
+            recvfrom(sockfd,&rcv_pkt,sizeof(Packet),0,(struct sockaddr*)&host_addr,&host_addr_len);
+
+            switch(rcv_pkt.cmd){
+
+                case(HELLO):{
+                    //salvo la porta e aggiorno il contatore
+                    int port=rcv_pkt.sender_port;
+                    ports[port-USER_START_PORT]=port;
+                    n_users++;
+
+                    printf("Utente porta: %i registrato.\nNumero utenti:%i\n",port,n_users);
+
+                    //se ci sono almeno due utenti e non è già in corso un available_card mando l'AVAILABLE_CARD
+                    if(n_users >=2&&doing_available==false){
+                    available_card(sockfd);
+                    }
+                    break;
+                }
+                     
+                case(QUIT):{
+                    //rimuovo la porta dall'array e aggiorno il contatore
+                    int port=rcv_pkt.sender_port;
+                    ports[port-USER_START_PORT]=0;
+                    n_users--;
+
+                    printf("Utente porta: %i scollegato.\nNumero utenti:%i\n",port,n_users);
+
+                    //sposto un eventuale carta in svolgimento dall'utente in TODO
+                    if(doing[port-USER_START_PORT]!=-1){
+                        move_card(doing[port-USER_START_PORT],TODO);
+                        //se ci sono almeno due utenti mando l'available card
+                    }
+                    break;
+                }
+                        
+                case(ACK_CARD):{
+                    //disabilito la procedura available_card
+                    doing_available=false;
+                    //salvo in doing l'id della carta
+                    doing[rcv_pkt.sender_port-USER_START_PORT]=rcv_pkt.card.id;
+                    //sposto la carta nella colonna DOING
+                    move_card(rcv_pkt.card.id,DOING);
+                    print_lavagna();
+
+                    printf("Carta di id: %i assegnata all'utente %i\n",rcv_pkt.card.id,rcv_pkt.sender_port);
+                    break;
+                }
+                         
+                case(CARD_DONE):{
+                    //setto a -1 il doing dell'utente
+                    doing[rcv_pkt.sender_port-USER_START_PORT]=-1;
+                    //sposto la carta nella colonna DONE
+                    move_card(rcv_pkt.card.id,DONE);
+                    print_lavagna();
+
+                    printf("Carta di id: %i completata\n",rcv_pkt.card.id);
+
+                    //se ci sono almeno 2 utenti chiamo l'AVAILABLE_CARD in quanto l'utente ha terminato una carta
+                    if(n_users >=2){
+                        available_card(sockfd);
+                    }
+                    break;
+                }
+                         
+                case(CREATE_CARD):{
+                    //aggiungo la carta alla lavagna
+                    add_card(rcv_pkt.card);
+                    print_lavagna();
+                    break;
+                }
+                         
+            }
+
+        }
+
+        if(FD_ISSET(STDIN_FILENO,&fd_list)){ //se è arrivato qualcosa da tastiera
+            char cmd[256];
+            scanf("%s",cmd);
+            printf("%s\n",cmd);
+        }
+
+        
     }
 
 

@@ -17,8 +17,6 @@ void send_packet(int socket,Packet *p,struct sockaddr_in *dest){
     int sent= sendto(socket,p,sizeof(Packet),0,(struct sockaddr*) dest,sizeof(struct sockaddr_in));
     if(sent<0){
         perror("Errore send_packet");
-    }else{
-        //printf("Inviati %i byte\n",sent);
     }
 }
 
