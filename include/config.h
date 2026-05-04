@@ -11,10 +11,11 @@ unico aiuta all'eventuale modifica di questi ultimi*/
 #define MAX_CARDS 20 //numero massimo di carte in una lavagna
 
 // Tempo dopo il quale una card in "Doing" riceve un PING (90 secondi) 
-#define TIMEOUT_PING_SECONDS 90     
-
+#define TIMEOUT_PING_SECONDS 10     
 // Tempo di attesa per la risposta PONG (30 secondi) 
-#define TIMEOUT_PONG_SECONDS 30     
+#define TIMEOUT_PONG_SECONDS 10  
+// Tempo dopo il quale un utente decide di scegliere anche se non sono arrivati tutti i costi  
+#define TIMEOUT_CHOOSE_USER 20
 
 #define MAX_TEXT_LEN 256 // Lunghezza massima del testo di un'attività 
 

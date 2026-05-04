@@ -14,6 +14,11 @@
 #include "../include/protocol.h"
 #include "utils.c"
 
+int sockfd; //socket
+int my_port=SERVER_PORT; //porta di ascolto
+struct sockaddr_in my_addr; //indirizzo del server
+struct sockaddr_in host_addr; //indirizzo host generico
+
 
 /**
  * @brief vettore che contiene le porte degli utenti registrati
@@ -27,6 +32,15 @@ int n_users=0;
  * @brief vettore che contiene l'id della carta in doing dall'utente con porta i+USER_START_PORT
  */
 int doing[MAX_UTENTI];
+
+/**
+ * @brief istante di inizio del timer per il ping
+ */
+time_t last_pingpong;
+/**
+ * @brief indica se siamo in attesa di un pong
+ */
+bool pinged=false;
 
 /**
  * @brief struttura dati della lavagna
@@ -249,12 +263,6 @@ void available_card(int sockfd){
 
     av_pkt.card=*l.col[TODO]; //metto la carta in cima a TODO nel pacchetto
 
-    //creo l'indirizzo generico (senza porta)
-    struct sockaddr_in host_addr;
-    memset(&host_addr, 0, sizeof(host_addr));
-    host_addr.sin_family=AF_INET;
-    inet_pton(AF_INET,SERVER_IP,&host_addr.sin_addr);
-
     //per ogni utente registrato modifico il pacchetto inserendo la lista degli altri utenti registrati, modifico l'indirizzo e invio 
     for(int i=0;i<n_users;i++){
         for(int j=0,J=0;J<n_users;j++,J++){
@@ -274,20 +282,49 @@ void available_card(int sockfd){
     //torno al loop in modo da mettermi in ascolto per la ricezione di ACK_CARD
 }
 
+void ping_user(){
+    if(pinged)
+        return;
+    Packet ping_pkt;
+    memset(&ping_pkt,0,sizeof(Packet));
+    ping_pkt.cmd=PING_USER;
+
+    host_addr.sin_port=htons(l.col[DOING]->user_port); //assegno all'indirizzo la porta dell'utente che sta svolgendo il task
+    send_packet(sockfd,&ping_pkt,&host_addr);
+    pinged=true;
+}
+
+void quit(int port){
+    //rimuovo la porta dall'array e aggiorno il contatore
+    ports[port-USER_START_PORT]=0;
+    n_users--;
+
+    printf("Utente porta: %i scollegato.\nNumero utenti:%i\n",port,n_users);
+
+    //sposto un eventuale carta in svolgimento dall'utente in TODO
+    if(doing[port-USER_START_PORT]!=-1){
+        move_card(doing[port-USER_START_PORT],TODO);
+
+        //se ci sono almeno due utenti mando l'available card
+        if(n_users>=2){
+            available_card(sockfd);
+        }
+    }
+}
+
 int main(){
 
     init_lavagna();
     print_lavagna();
 
     //creo il socket UDP
-    int sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    sockfd=socket(AF_INET,SOCK_DGRAM,0);
     if(sockfd<1){
         perror("Errore nella creazione del socket");
         return 1;
     }
 
     //assegno un indirizzo al socket
-    struct sockaddr_in my_addr;
     memset(&my_addr, 0, sizeof(my_addr));
     my_addr.sin_family=AF_INET;
     inet_pton(AF_INET,SERVER_IP,&my_addr.sin_addr);
@@ -298,6 +335,11 @@ int main(){
         close(sockfd);
         return 1;
     }
+
+    //creo l'indirizzo host generico (senza porta)
+    memset(&host_addr, 0, sizeof(host_addr));
+    host_addr.sin_family=AF_INET;
+    inet_pton(AF_INET,SERVER_IP,&host_addr.sin_addr);
 
     printf("Server in ascolto sulla porta %i...\n",SERVER_PORT);
 
@@ -315,9 +357,45 @@ int main(){
 
         int max_fd = sockfd; //suppongo che il max sia il socket in quanto STDIN vale 0
 
-        if (select(max_fd + 1, &fd_list, NULL, NULL, NULL) < 0) { //mi metto in attesa su entrambi i fronti
+
+        // creo il timer
+        struct timeval* timeout=NULL;
+
+        time_t doing_time=time(NULL)-last_pingpong; //tempo passato dall'ultimo ping
+        if(l.col[DOING]){ //se c'è un task in esecuzione
+            if(doing_time>=TIMEOUT_PING_SECONDS){ //se è passato + di TIMEOUT_PING_SECONDS invio il ping (una volta sola)
+                ping_user();
+                if(doing_time>=TIMEOUT_PING_SECONDS+TIMEOUT_PONG_SECONDS){ // se è passato + di TIMEOUT_PING_SECONDS + TIMEOUT_PONG
+                    pinged=false;
+                    quit(l.col[DOING]->user_port); //disconnetto l'utente
+                }else{ //sennò setto il timeout del select per catturare la scadenza del pong
+                    struct timeval tv;
+                    timeout=&tv;
+                    timeout->tv_sec=TIMEOUT_PING_SECONDS+TIMEOUT_PONG_SECONDS-doing_time;
+                    timeout->tv_usec=0;
+                }
+
+            }else{
+                //assegno il timeout del ping alla select, se scade mentre sono in ascolto gestisco subito il ping
+                struct timeval tv;
+                timeout=&tv;
+                timeout->tv_sec=TIMEOUT_PING_SECONDS-doing_time;
+                timeout->tv_usec=0;
+            }  
+        }
+
+        int res=select(max_fd + 1, &fd_list, NULL, NULL, timeout);
+
+        if ( res< 0) { //mi metto in attesa su entrambi i fronti
             perror("Errore nella select");
             return 1;
+        }else if(res==0){ //se scade il timeout alla select 
+            if(pinged){
+                pinged=0;
+                quit(l.col[DOING]->user_port); //disconnetto l'utente
+            }else{ 
+                ping_user();
+            }   
         }
 
         if(FD_ISSET(sockfd,&fd_list)){ //se è arrivato un pacchetto
@@ -347,18 +425,7 @@ int main(){
                 }
                      
                 case(QUIT):{
-                    //rimuovo la porta dall'array e aggiorno il contatore
-                    int port=rcv_pkt.sender_port;
-                    ports[port-USER_START_PORT]=0;
-                    n_users--;
-
-                    printf("Utente porta: %i scollegato.\nNumero utenti:%i\n",port,n_users);
-
-                    //sposto un eventuale carta in svolgimento dall'utente in TODO
-                    if(doing[port-USER_START_PORT]!=-1){
-                        move_card(doing[port-USER_START_PORT],TODO);
-                        //se ci sono almeno due utenti mando l'available card
-                    }
+                    quit(rcv_pkt.sender_port);
                     break;
                 }
                         
@@ -369,6 +436,11 @@ int main(){
                     doing[rcv_pkt.sender_port-USER_START_PORT]=rcv_pkt.card.id;
                     //sposto la carta nella colonna DOING
                     move_card(rcv_pkt.card.id,DOING);
+                    //aggiorno l'utente associato alla carta
+                    l.cards[rcv_pkt.card.id].user_port=rcv_pkt.sender_port;
+                    //aggiorno l'istante di inizio del timer
+                    last_pingpong=time(NULL);
+
                     print_lavagna();
 
                     printf("Carta di id: %i assegnata all'utente %i\n",rcv_pkt.card.id,rcv_pkt.sender_port);
@@ -376,13 +448,18 @@ int main(){
                 }
                          
                 case(CARD_DONE):{
+                    //Se il card done arriva prima del pong,interpreto comunque che l'utente non si è disconnesso
+                    last_pingpong=time(NULL);
+                    pinged=0;
+
                     //setto a -1 il doing dell'utente
                     doing[rcv_pkt.sender_port-USER_START_PORT]=-1;
+
+                    printf("Carta di id: %i completata\n",rcv_pkt.card.id);
+
                     //sposto la carta nella colonna DONE
                     move_card(rcv_pkt.card.id,DONE);
                     print_lavagna();
-
-                    printf("Carta di id: %i completata\n",rcv_pkt.card.id);
 
                     //se ci sono almeno 2 utenti chiamo l'AVAILABLE_CARD in quanto l'utente ha terminato una carta
                     if(n_users >=2){
@@ -395,6 +472,18 @@ int main(){
                     //aggiungo la carta alla lavagna
                     add_card(rcv_pkt.card);
                     print_lavagna();
+
+                    //se ci sono almeno due utenti e non è già in corso un available_card mando l'AVAILABLE_CARD
+                    if(n_users >=2&&doing_available==false){
+                    available_card(sockfd);
+                    }
+                    break;
+                }
+
+                case(PONG_LAVAGNA):{
+                    last_pingpong=time(NULL);
+                    pinged=0;
+                    printf("L'utente %i ha risposto al ping\n",l.col[DOING]->user_port);
                     break;
                 }
                          

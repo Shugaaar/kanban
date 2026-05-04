@@ -14,7 +14,9 @@
 #include "../include/protocol.h"
 #include "utils.c"
 
-
+int my_port; //porta utente
+int sockfd; //socket 
+struct sockaddr_in server_addr; //indirizzo del server
 
 int costs[MAX_UTENTI-1]; //costi ricevuti dagli altri utenti
 int peer_ports[MAX_UTENTI-1]; //array che per ogni i indica la porta di colui che ha costs[i], serve solo per scegliere sul numero di porta in caso di parità di costo
@@ -25,21 +27,68 @@ int my_cost; //costo calcolato randomicamente
 
 struct Card doing; //se id!=-1 corrisponde alla carta che sto eseguendo
 
+/**
+ * @brief analizza i costi ricevuti e verifica se sono il chosen, se lo sono invia l'ACK_CARD alla lavagna
+ * @param numero di peer che hanno inviato un costo
+ */
+void choose_user(int n){
 
+    bool chosen=true;
+    for(int i=0;i<n;i++){ //se il mio costo è maggiore di almeno un peer non sono il chosen
+        if(my_cost>costs[i]){
+            chosen=false;
+            doing.id=-1;
+            break;
+        }
+        if(my_cost==costs[i]){ //se ho il costo uguale a qualcun'altro e ho porta maggiore non posso essere il chosen
+            printf("SONO ENTRATO NEL CASO DI PARITA' DI COSTO\n");
+            if(my_port>peer_ports[i]){
+            chosen=false;
+            doing.id=-1;
+            break;
+            }
+        }
+    }
+    if(chosen){ // se sono il chosen mando alla lavagna l'ACK_CARD
+
+        printf("Ti è stata assegnata una carta\n");
+        print_card(doing);
+
+        Packet ack_pkt;
+        memset(&ack_pkt,0,sizeof(Packet));
+        ack_pkt.cmd=ACK_CARD;
+        ack_pkt.sender_port=my_port;
+        copy_card(doing,&ack_pkt.card);
+        send_packet(sockfd,&ack_pkt,&server_addr);
+
+        sleep(15);
+
+        //dopo 15 secondi mando il CARD_DONE
+
+        Packet done_pkt;
+        memset(&done_pkt,0,sizeof(Packet));
+        done_pkt.cmd=CARD_DONE;
+        done_pkt.sender_port=my_port;
+        copy_card(doing,&done_pkt.card);
+        send_packet(sockfd,&done_pkt,&server_addr);
+        
+    }
+
+}
 
 int main(int argc,char* argv[]){
     if(argc !=2){
         fprintf(stderr,"Uso: %s [porta utente]\n",argv[0]);
         return 1;
     }
-    int my_port=atoi(argv[1]);
+    my_port=atoi(argv[1]);
     if(my_port<USER_START_PORT||my_port>USER_START_PORT+MAX_UTENTI){
         fprintf(stderr,"La porta utente dev'essere compresa tra %i e %i\n",USER_START_PORT,USER_START_PORT+MAX_UTENTI);
         return 1;
     }
 
     //creo il socket di tipo UDP
-    int sockfd=socket(AF_INET,SOCK_DGRAM,0);
+    sockfd=socket(AF_INET,SOCK_DGRAM,0);
     if(sockfd<0){
         perror("Errore durante la creazione del socket\n");
         return 1;
@@ -59,7 +108,6 @@ int main(int argc,char* argv[]){
     }
     
     //creo l'indirizzo della lavagna
-    struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family=AF_INET;
     server_addr.sin_port=htons(SERVER_PORT);
@@ -89,9 +137,24 @@ int main(int argc,char* argv[]){
 
         int max_fd = sockfd; //suppongo che il max sia il socket in quanto STDIN vale 0
 
-        if (select(max_fd + 1, &fd_list, NULL, NULL, NULL) < 0) { //mi metto in attesa su entrambi i fronti
+        //inizializzo il timeout
+        struct timeval timeout;
+        timeout.tv_sec=TIMEOUT_CHOOSE_USER;
+        timeout.tv_usec=0;
+
+        int res=select(max_fd + 1, &fd_list, NULL, NULL, &timeout);
+
+        if (res < 0) { //mi metto in attesa su entrambi i fronti
             perror("Errore nella select");
             return 1;
+
+        }else if(res==0){ //se è scattato il timeout
+
+            if(n_peer_remaining!=0){ //scelgo con i costi che mi sono arrivati fino ad ora, suppongo che i peer che devono ancora mandare siano crashati
+                printf("TIMEOUT CHOOSE_USER\n");
+                choose_user(n_peer-n_peer_remaining);
+                n_peer_remaining=0;
+            }
         }
 
         if(FD_ISSET(sockfd,&fd_list)){
@@ -144,47 +207,18 @@ int main(int argc,char* argv[]){
                     n_peer_remaining--;
 
                     if(!n_peer_remaining){ 
-                        bool chosen=true;
-                        for(int i=0;i<n_peer;i++){ //se il mio costo è maggiore di almeno un peer non sono il chosen
-                            if(my_cost>costs[i]){
-                                chosen=false;
-                                doing.id=-1;
-                                break;
-                            }
-                            if(my_cost==costs[i]){ //se ho il costo uguale a qualcun'altro e ho porta maggiore non posso essere il chosen
-                                printf("SONO ENTRATO NEL CASO DI PARITA' DI COSTO\n");
-                                if(my_port>peer_ports[i]){
-                                    chosen=false;
-                                    doing.id=-1;
-                                    break;
-                                }
-                            }
-                        }
-                        if(chosen){ // se sono il chosen mando alla lavagna l'ACK_CARD
-
-                            printf("Ti è stata assegnata una carta\n");
-                            print_card(doing);
-
-                            Packet ack_pkt;
-                            memset(&ack_pkt,0,sizeof(Packet));
-                            ack_pkt.cmd=ACK_CARD;
-                            ack_pkt.sender_port=my_port;
-                            copy_card(doing,&ack_pkt.card);
-                            send_packet(sockfd,&ack_pkt,&server_addr);
-
-                            sleep(10);
-
-                            //dopo 10 secondi mando il CARD_DONE
-
-                            Packet done_pkt;
-                            memset(&done_pkt,0,sizeof(Packet));
-                            done_pkt.cmd=CARD_DONE;
-                            done_pkt.sender_port=my_port;
-                            copy_card(doing,&done_pkt.card);
-                            send_packet(sockfd,&done_pkt,&server_addr);
-    
-                        }
+                        choose_user(n_peer);
                     }
+                    break;
+                }
+                case PING_USER: {
+                
+                    Packet pong_pkt;
+                    memset(&pong_pkt, 0, sizeof(Packet));
+                    pong_pkt.cmd = PONG_LAVAGNA; // Rispondiamo con un PONG
+                    pong_pkt.sender_port = my_port;
+    
+                    send_packet(sockfd, &pong_pkt, &server_addr);
                     break;
                 }
             }             
