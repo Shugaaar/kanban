@@ -78,7 +78,7 @@ void choose_user(int n){
         //dopo 10 secondi mando il CARD_DONE
 
         sleep(10);
-        //card_done();
+        card_done();
     }
 
 }
@@ -293,7 +293,7 @@ int main(int argc,char* argv[]){
                     card_done();
                 }
             }else{
-                printf("Comandi validi: CREATE_CARD , QUIT \n");
+                printf("Comandi validi: CREATE_CARD , QUIT , CARD_DONE \n");
             }
         }
 

@@ -227,7 +227,7 @@ void print_lavagna(){
  * @brief segnala che è in corso un ciclo di available_card, necessario 
  * a evitare di coinvolgere utenti che si sono registrati mentre la procedura era in corso;
  * 
- * viene settato in AVAILABLE_CARD e resettato in ACK_CARD
+ * viene settato in AVAILABLE_CARD e resettato in CARD_DONE
  */
 bool doing_available=false;
 
@@ -237,14 +237,15 @@ bool doing_available=false;
  */
 void available_card(int sockfd){
 
-    //segnalo l'inizio della procedura available_card
-    doing_available=true;
-
     //se non ci sono task da svolgere ritorno
     if(l.col[TODO]==NULL){
         printf("Nessun task da svolgere...\n");
         return;
     }
+    
+    //segnalo l'inizio della procedura available_card
+    doing_available=true;
+
     int reg[n_users];
 
     for(int i=0,j=0;j<n_users;i++){ //salvo in un array tutti gli utenti registrati
@@ -341,8 +342,7 @@ int main(){
 
     printf("Server in ascolto sulla porta %i...\n",SERVER_PORT);
 
-    //DEVO RICEVERE DATI SIA DA TASTIERA CHE DAL SOCKET, in modo da ricevere pacchetti e tenere abilitato il terminale 
-    //contemporaneamente, per fare ciò mi servo dell'IO MULTIPLEXING
+    //uso la select sia per abilitare il terminale, sia per impostare il timeout per il ping pong
 
     fd_set fd_list; //creo la lista di file descriptor
 
@@ -431,8 +431,7 @@ int main(){
                 }
                         
                 case(ACK_CARD):{
-                    //disabilito la procedura available_card
-                    doing_available=false;
+                    
                     //salvo in doing l'id della carta
                     doing[rcv_pkt.sender_port-USER_START_PORT]=rcv_pkt.card.id;
                     //sposto la carta nella colonna DOING
@@ -454,6 +453,9 @@ int main(){
                     //Se il card done arriva prima del pong,interpreto comunque che l'utente non si è disconnesso
                     last_pingpong=time(NULL);
                     pinged=0;
+
+                    //disabilito la procedura available_card
+                    doing_available=false;
 
                     //setto a -1 il doing dell'utente
                     doing[rcv_pkt.sender_port-USER_START_PORT]=-1;
@@ -498,7 +500,12 @@ int main(){
         if(res&&FD_ISSET(STDIN_FILENO,&fd_list)){ //se è arrivato qualcosa da tastiera
             char cmd[256];
             scanf("%s",cmd);
-            printf("%s\n",cmd);
+            if(strcmp(cmd,"SHOW_LAVAGNA")==0){
+                print_lavagna();
+
+            }else{
+                printf("Comandi validi: SHOW_LAVAGNA \n");
+            }
         }
 
         
