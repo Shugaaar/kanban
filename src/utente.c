@@ -28,6 +28,18 @@ int my_cost; //costo calcolato randomicamente
 struct Card doing; //se id!=-1 corrisponde alla carta che sto eseguendo
 
 /**
+ * @brief spedisce il CARD_DONE della carta in doing
+ */
+void card_done(){
+    Packet done_pkt;
+    memset(&done_pkt,0,sizeof(Packet));
+    done_pkt.cmd=CARD_DONE;
+    done_pkt.sender_port=my_port;
+    copy_card(doing,&done_pkt.card);
+    send_packet(sockfd,&done_pkt,&server_addr);
+}
+
+/**
  * @brief analizza i costi ricevuti e verifica se sono il chosen, se lo sono invia l'ACK_CARD alla lavagna
  * @param numero di peer che hanno inviato un costo
  */
@@ -61,17 +73,12 @@ void choose_user(int n){
         copy_card(doing,&ack_pkt.card);
         send_packet(sockfd,&ack_pkt,&server_addr);
 
-        sleep(15);
 
-        //dopo 15 secondi mando il CARD_DONE
 
-        Packet done_pkt;
-        memset(&done_pkt,0,sizeof(Packet));
-        done_pkt.cmd=CARD_DONE;
-        done_pkt.sender_port=my_port;
-        copy_card(doing,&done_pkt.card);
-        send_packet(sockfd,&done_pkt,&server_addr);
-        
+        //dopo 10 secondi mando il CARD_DONE
+
+        sleep(10);
+        //card_done();
     }
 
 }
@@ -157,7 +164,7 @@ int main(int argc,char* argv[]){
             }
         }
 
-        if(FD_ISSET(sockfd,&fd_list)){
+        if(res&&FD_ISSET(sockfd,&fd_list)){
 
             Packet rcv_pkt;
             struct sockaddr_in sender_addr;
@@ -224,7 +231,7 @@ int main(int argc,char* argv[]){
             }             
         }
 
-        if(FD_ISSET(STDIN_FILENO,&fd_list)){
+        if(res&&FD_ISSET(STDIN_FILENO,&fd_list)){
             char cmd[256];
             scanf("%s",cmd); //leggo da tastiera il comando
 
@@ -278,6 +285,13 @@ int main(int argc,char* argv[]){
                 send_packet(sockfd,&quit_pkt,&server_addr);
                 return 0;
 
+            }else if (strcmp(cmd,"CARD_DONE")==0)
+            {
+                if(doing.id==-1){
+                    printf("Non hai una carta assegnata!\n");
+                }else{
+                    card_done();
+                }
             }else{
                 printf("Comandi validi: CREATE_CARD , QUIT \n");
             }

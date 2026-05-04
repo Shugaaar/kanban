@@ -278,8 +278,6 @@ void available_card(int sockfd){
         
         send_packet(sockfd,&av_pkt,&host_addr);
     }
-
-    //torno al loop in modo da mettermi in ascolto per la ricezione di ACK_CARD
 }
 
 void ping_user(){
@@ -362,7 +360,7 @@ int main(){
         struct timeval* timeout=NULL;
 
         time_t doing_time=time(NULL)-last_pingpong; //tempo passato dall'ultimo ping
-        if(l.col[DOING]){ //se c'è un task in esecuzione
+        if(l.col[DOING]!=NULL){ //se c'è un task in esecuzione
             if(doing_time>=TIMEOUT_PING_SECONDS){ //se è passato + di TIMEOUT_PING_SECONDS invio il ping (una volta sola)
                 ping_user();
                 if(doing_time>=TIMEOUT_PING_SECONDS+TIMEOUT_PONG_SECONDS){ // se è passato + di TIMEOUT_PING_SECONDS + TIMEOUT_PONG
@@ -384,12 +382,14 @@ int main(){
             }  
         }
 
+
         int res=select(max_fd + 1, &fd_list, NULL, NULL, timeout);
 
         if ( res< 0) { //mi metto in attesa su entrambi i fronti
             perror("Errore nella select");
             return 1;
         }else if(res==0){ //se scade il timeout alla select 
+            
             if(pinged){
                 pinged=0;
                 quit(l.col[DOING]->user_port); //disconnetto l'utente
@@ -398,7 +398,8 @@ int main(){
             }   
         }
 
-        if(FD_ISSET(sockfd,&fd_list)){ //se è arrivato un pacchetto
+
+        if(res&&FD_ISSET(sockfd,&fd_list)){ //se è arrivato un pacchetto
 
             Packet rcv_pkt;
             struct sockaddr_in host_addr;
@@ -448,6 +449,8 @@ int main(){
                 }
                          
                 case(CARD_DONE):{
+                    if(!l.col[DOING]) // se l'utente manda l'ACK_CARD dopo essere stato catalogato come scollegato questa viene ignorata
+                        break;
                     //Se il card done arriva prima del pong,interpreto comunque che l'utente non si è disconnesso
                     last_pingpong=time(NULL);
                     pinged=0;
@@ -483,7 +486,8 @@ int main(){
                 case(PONG_LAVAGNA):{
                     last_pingpong=time(NULL);
                     pinged=0;
-                    printf("L'utente %i ha risposto al ping\n",l.col[DOING]->user_port);
+                    if(l.col[DOING])
+                        printf("L'utente %i ha risposto al ping\n",l.col[DOING]->user_port);
                     break;
                 }
                          
@@ -491,7 +495,7 @@ int main(){
 
         }
 
-        if(FD_ISSET(STDIN_FILENO,&fd_list)){ //se è arrivato qualcosa da tastiera
+        if(res&&FD_ISSET(STDIN_FILENO,&fd_list)){ //se è arrivato qualcosa da tastiera
             char cmd[256];
             scanf("%s",cmd);
             printf("%s\n",cmd);
